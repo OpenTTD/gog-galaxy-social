@@ -1,0 +1,7 @@
+/.vs/
+/build*
+/lib/
+/out/
+/sdk/
+/src/galaxy/
+CMakeSettings.json
