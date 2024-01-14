@@ -1,0 +1,37 @@
+
+if(APPLE)
+    set(FOLDER_PREFIX "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/OpenTTD-${CPACK_PACKAGE_NAME}.app/Contents/Resources")
+
+    file(GLOB LIBRARIES "${FOLDER_PREFIX}/*.dylib")
+    set(MAIN_LIBRARY_NAME "lib${CPACK_PACKAGE_NAME}.dylib")
+elseif(WIN32)
+    set(FOLDER_PREFIX "${CPACK_TEMPORARY_INSTALL_DIRECTORY}")
+
+    file(GLOB LIBRARIES "${FOLDER_PREFIX}/*.dll")
+    set(MAIN_LIBRARY_NAME "${CPACK_PACKAGE_NAME}.dll")
+elseif(UNIX)
+    set(FOLDER_PREFIX "${CPACK_TEMPORARY_INSTALL_DIRECTORY}")
+
+    file(GLOB LIBRARIES "${FOLDER_PREFIX}/*.so")
+    set(MAIN_LIBRARY_NAME "lib${CPACK_PACKAGE_NAME}.so")
+endif()
+
+message(STATUS "Creating signature file ${MAIN_LIBRARY_NAME}.sig for the following files:")
+foreach(LIBRARY ${LIBRARIES})
+    get_filename_component(LIBRARY_NAME "${LIBRARY}" NAME)
+    message(STATUS "- ${LIBRARY_NAME}")
+
+    # Sign the libraries just before we calculate the checksum.
+    # This way CPack did all its magic, and if we let CPack do the signing
+    # we calculate the wrong checksum (as it happens after this step).
+    if (APPLE)
+        execute_process(
+            COMMAND codesign --deep -f --options runtime -s "$ENV{APPLE_DEVELOPER_CERTIFICATE_ID}" -i org.openttd.${CPACK_PACKAGE_NAME} ${LIBRARY}
+        )
+    endif()
+endforeach()
+
+execute_process(
+    COMMAND python3 "@CMAKE_SOURCE_DIR@/cmake/create_signature_file.py" "${LIBRARIES}"
+    OUTPUT_FILE "${FOLDER_PREFIX}/${MAIN_LIBRARY_NAME}.sig"
+)

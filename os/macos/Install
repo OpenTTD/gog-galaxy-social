@@ -1,0 +1,18 @@
+#!/bin/bash
+
+result=$(osascript -e 'display dialog "OpenTTD''s GOG Galaxy Integration Plugin will be installed on your computer. Do you want to continue?" buttons {"Yes", "No"} default button "Yes"')
+
+if [ "${result}" != "button returned:Yes" ]; then
+    exit 0
+fi
+
+RESOURCES_PATH=$(dirname "${0}")/../Resources
+OPENTTD_SOCIAL_PATH=${HOME}/Documents/OpenTTD/social_integration/gog-galaxy
+
+mkdir -p "${OPENTTD_SOCIAL_PATH}"
+
+cp "${RESOURCES_PATH}/libGalaxy64.dylib" "${OPENTTD_SOCIAL_PATH}/"
+cp "${RESOURCES_PATH}/libgog-galaxy-social.dylib" "${OPENTTD_SOCIAL_PATH}/"
+cp "${RESOURCES_PATH}/libgog-galaxy-social.dylib.sig" "${OPENTTD_SOCIAL_PATH}/"
+
+osascript -e 'display dialog "OpenTTD''s GOG Galaxy Integration Plugin has been installed to the OpenTTD folder in your Documents folder." buttons {"OK"} default button "OK"'
