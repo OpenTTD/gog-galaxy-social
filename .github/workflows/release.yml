@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Ref to build (for Pull Requests, use refs/pull/NNN/head)'
+        required: true
+  release:
+    types:
+    - published
+
+jobs:
+  source:
+    name: Source
+
+    uses: ./.github/workflows/release-source.yml
+    secrets: inherit
+
+  macos:
+    name: MacOS
+    needs: source
+
+    uses: ./.github/workflows/release-macos.yml
+    secrets: inherit
+    with:
+      gog_galaxy_sdk_version: 1.152.8
+
+  windows:
+    name: Windows
+    needs: source
+
+    uses: ./.github/workflows/release-windows.yml
+    secrets: inherit
+    with:
+      gog_galaxy_sdk_version: 1.152.8
+
+  upload-cdn:
+    name: Upload (CDN)
+    needs:
+    - source
+    - macos
+    - windows
+
+    if: github.event_name == 'release'
+
+    uses: ./.github/workflows/upload-cdn.yml
+    secrets: inherit
+
+    with:
+      version: ${{ needs.source.outputs.version }}
+
+  upload-github:
+    name: Upload (GitHub)
+    needs:
+    - source
+    - macos
+    - windows
+
+    if: github.event_name == 'release'
+
+    uses: ./.github/workflows/upload-github.yml
+    secrets: inherit
+
+    with:
+      version: ${{ needs.source.outputs.version }}
