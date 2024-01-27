@@ -1,0 +1,53 @@
+name: Upload (GitHub)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  upload:
+    name: Upload (GitHub)
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Download bundle (Source)
+      uses: actions/download-artifact@v4
+      with:
+        name: gog-galaxy-social-source
+        path: gog-galaxy-social-source
+
+    - name: Download bundle (Windows x86)
+      uses: actions/download-artifact@v4
+      with:
+        name: gog-galaxy-social-windows-x86
+        path: gog-galaxy-social-windows-x86
+
+    - name: Download bundle (Windows x64)
+      uses: actions/download-artifact@v4
+      with:
+        name: gog-galaxy-social-windows-x64
+        path: gog-galaxy-social-windows-x64
+
+    - name: Download bundle (MacOS)
+      uses: actions/download-artifact@v4
+      with:
+        name: gog-galaxy-social-macos-universal
+        path: gog-galaxy-social-macos-universal
+
+    - name: Upload to GitHub
+      run: |
+        # "gh" only works automatically if run from a git repository.
+        git init
+        git remote add origin ${{ github.event.repository.html_url }}
+
+        # Don't upload some files
+        rm gog-galaxy-social-source/README.md
+        rm gog-galaxy-social-source/released.txt
+
+        gh release upload ${{ inputs.version }} gog-galaxy-social-*/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

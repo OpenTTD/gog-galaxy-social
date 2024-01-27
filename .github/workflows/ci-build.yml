@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+    - main
+
+env:
+  GOG_GALAXY_SDK_VERSION: 1.152.8
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - arch: x64
+          full_arch: x86_64
+        - arch: arm64
+          full_arch: arm64
+
+    name: Mac OS (${{ matrix.arch }})
+
+    runs-on: macos-latest
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 10.15
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install GOG Galaxy SDK
+      shell: bash
+      run: |
+        ./download-sdk.sh macos ${{ env.GOG_GALAXY_SDK_VERSION }}
+
+    - name: Install GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+
+        echo "::group::CMake"
+        cmake .. \
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.full_arch }} \
+          -DGOG_GALAXY_CLIENT_ID="a" \
+          -DGOG_GALAXY_CLIENT_SECRET="a" \
+          # EOF
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        echo "Running on $(sysctl -n hw.logicalcpu) cores"
+        cmake --build . -j $(sysctl -n hw.logicalcpu)
+        echo "::endgroup::"
+
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-2019]
+        arch: [x86, x64]
+
+    name: Windows (${{ matrix.os }} / ${{ matrix.arch }})
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install GOG Galaxy SDK
+      shell: bash
+      run: |
+        if [ "${{ matrix.arch }}" = "x86" ]; then
+          ./download-sdk.sh win32 ${{ env.GOG_GALAXY_SDK_VERSION }}
+        else
+          ./download-sdk.sh win64 ${{ env.GOG_GALAXY_SDK_VERSION }}
+        fi
+
+    - name: Install MSVC problem matcher
+      uses: ammaraskar/msvc-problem-matcher@master
+
+    - name: Configure developer command prompt for ${{ matrix.arch }}
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: ${{ matrix.arch }}
+
+    - name: Build
+      shell: bash
+      env:
+        NINJA_STATUS: "[%f/%t -- %e] " # [finished_edges/total_edges -- elapsed_time], default value is "[%f/%t] "
+      run: |
+        mkdir build
+        cd build
+
+        echo "::group::CMake"
+        cmake .. \
+          -GNinja \
+          -DGOG_GALAXY_CLIENT_ID="a" \
+          -DGOG_GALAXY_CLIENT_SECRET="a" \
+          # EOF
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        cmake --build .
+        echo "::endgroup::"
+
+  check_annotations:
+    name: Check Annotations
+    needs:
+    - macos
+    - windows
+
+    if: always() && github.event_name == 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check annotations
+      uses: OpenTTD/actions/annotation-check@v3

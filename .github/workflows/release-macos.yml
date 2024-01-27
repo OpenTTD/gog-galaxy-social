@@ -1,0 +1,188 @@
+name: Release (MacOS)
+
+on:
+  workflow_call:
+    inputs:
+      gog_galaxy_sdk_version:
+        description: 'GOG Galaxy SDK version to use'
+        type: string
+        required: true
+
+jobs:
+  macos:
+    name: MacOS
+
+    runs-on: macos-latest
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 10.15
+
+    steps:
+    - name: Download source
+      uses: actions/download-artifact@v4
+      with:
+        name: internal-source
+
+    - name: Unpack source
+      run: |
+        tar -xf source.tar.gz --strip-components=1
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Enable Rust cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install dependencies
+      run: |
+        echo "::group::Install python dependencies"
+        python3 -m pip install cryptography
+        echo "::endgroup::"
+
+        echo "::group::Install breakpad dependencies"
+        cargo install dump_syms
+        echo "::endgroup::"
+
+    - name: Install GOG Galaxy SDK
+      shell: bash
+      run: |
+        ./download-sdk.sh macos ${{ inputs.gog_galaxy_sdk_version }}
+
+    - name: Import code signing certificates
+      uses: Apple-Actions/import-codesign-certs@v2
+      with:
+        p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
+        p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+      # If this is run on a fork, there may not be a certificate set up - continue in this case
+      continue-on-error: true
+
+    - name: Install GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Build arm64
+      run: |
+        mkdir build-arm64
+        cd build-arm64
+
+        echo "::group::CMake"
+        cmake ${GITHUB_WORKSPACE} \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DGOG_GALAXY_CLIENT_ID=${{ secrets.GOG_GALAXY_CLIENT_ID }} \
+          -DGOG_GALAXY_CLIENT_SECRET=${{ secrets.GOG_GALAXY_CLIENT_SECRET }} \
+          -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+          # EOF
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        echo "Running on $(sysctl -n hw.logicalcpu) cores"
+        cmake --build . -j $(sysctl -n hw.logicalcpu)
+        echo "::endgroup::"
+
+    - name: Build x64
+      run: |
+        mkdir build-x64
+        cd build-x64
+
+        echo "::group::CMake"
+        cmake ${GITHUB_WORKSPACE} \
+          -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DGOG_GALAXY_CLIENT_ID=${{ secrets.GOG_GALAXY_CLIENT_ID }} \
+          -DGOG_GALAXY_CLIENT_SECRET=${{ secrets.GOG_GALAXY_CLIENT_SECRET }} \
+          -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+          -DCPACK_BUNDLE_APPLE_CERT_APP=${{ secrets.APPLE_DEVELOPER_CERTIFICATE_ID }} \
+          -DAPPLE_UNIVERSAL_PACKAGE=1 \
+          # EOF
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        echo "Running on $(sysctl -n hw.logicalcpu) cores"
+        cmake --build . -j $(sysctl -n hw.logicalcpu)
+        echo "::endgroup::"
+
+    - name: Create breakpad symbols
+      run: |
+        cd build-x64
+        mkdir dSYM
+        dsymutil ./libgog-galaxy-social.dylib -o dSYM/libgog-galaxy-social.dylib
+        dump_syms ./dSYM/libgog-galaxy-social.dylib --inlines --store symbols
+
+        cd ../build-arm64
+        mkdir dSYM
+        dsymutil ./libgog-galaxy-social.dylib -o dSYM/libgog-galaxy-social.dylib
+        dump_syms ./dSYM/libgog-galaxy-social.dylib --inlines --store ../build-x64/symbols
+
+    - name: Create bundles
+      run: |
+        echo "::group::Create universal binary"
+        # We first install both targets, as that changes the RPath to @loader_path.
+        # Although this is also done after the universal binary is created, it only
+        # removes the x64 path; not the arm64 path.
+        (
+          cd build-arm64
+          make install
+        )
+
+        cd build-x64
+        make install
+
+        # Combine the binaries from each build into a single file.
+        lipo -create -output libgog-galaxy-social.dylib ../build-*/install/libgog-galaxy-social.dylib
+        echo "::endgroup::"
+
+        echo "::group::Run CPack"
+        cpack
+        echo "::endgroup::"
+      env:
+        OPENTTD_PLUGIN_PRIVATE_KEY: ${{ secrets.OPENTTD_PLUGIN_PRIVATE_KEY }}
+        APPLE_DEVELOPER_CERTIFICATE_ID: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_ID }}
+
+    - name: Notarize
+      env:
+        AC_USERNAME: ${{ secrets.APPLE_DEVELOPER_APP_USERNAME }}
+        AC_PASSWORD: ${{ secrets.APPLE_DEVELOPER_APP_PASSWORD }}
+        AC_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+      run: |
+        if [ -z "${AC_USERNAME}" ]; then
+            # We may be running on a fork that doesn't have notarization secrets set up; skip this step
+            echo No notarization secrets set up, skipping.
+            exit 0
+        fi
+
+        xcrun notarytool store-credentials --apple-id "${AC_USERNAME}" --password "${AC_PASSWORD}" --team-id "${AC_TEAM_ID}" openttd
+        cd build-x64
+        ../os/macos/notarize.sh
+
+    - name: Build zip
+      run: |
+        cd build-x64
+
+        (
+          cd _CPack_Packages/*/Bundle/gog-galaxy-social-*/
+
+          # Remove the original dmg built by CPack to avoid a conflict when resolving
+          # the zip_filename variable below
+          rm -f ../*.dmg
+
+          zip_filename=(../gog-galaxy-social-*)
+
+          # Package up the existing, notarised .app into a zip file
+          zip -r -9 ${zip_filename}.zip OpenTTD-gog-galaxy-social.app Install.txt
+        )
+
+        # Now move it into place to be uploaded
+        mv _CPack_Packages/*/Bundle/gog-galaxy-social-*.zip bundles/
+
+    - name: Store bundles
+      uses: actions/upload-artifact@v4
+      with:
+        name: gog-galaxy-social-macos-universal
+        path: build-x64/bundles
+        retention-days: 5
+
+    - name: Store symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: symbols-macos-universal
+        path: build-x64/symbols
+        retention-days: 5
