@@ -33,6 +33,10 @@ mkdir sdk
             curl -O https://cdn.gog.com/open/galaxy/sdk/${SDK_VERSION}/Downloads/DevelopmentKit_${SDK_VERSION}_OSX_universal.tar.gz
             tar -xzf DevelopmentKit_${SDK_VERSION}_OSX_universal.tar.gz
             mv DevelopmentKit_${SDK_VERSION}_OSX_universal DevelopmentKit
+
+            # The dylib is internally called libGalaxy.dylib, so name it as such on disk too.
+            # Otherwise either CMake or MacOS gets confused.
+            mv DevelopmentKit/Libraries/libGalaxy64.dylib DevelopmentKit/Libraries/libGalaxy.dylib
             ;;
         *)
             echo "ERROR - Unsupported OS '${SDK_OS}'"

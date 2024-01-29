@@ -11,7 +11,7 @@ OPENTTD_SOCIAL_PATH=${HOME}/Documents/OpenTTD/social_integration/gog-galaxy
 
 mkdir -p "${OPENTTD_SOCIAL_PATH}"
 
-cp "${RESOURCES_PATH}/libGalaxy64.dylib" "${OPENTTD_SOCIAL_PATH}/"
+cp "${RESOURCES_PATH}/libGalaxy.dylib" "${OPENTTD_SOCIAL_PATH}/"
 cp "${RESOURCES_PATH}/libgog-galaxy-social.dylib" "${OPENTTD_SOCIAL_PATH}/"
 cp "${RESOURCES_PATH}/libgog-galaxy-social.dylib.sig" "${OPENTTD_SOCIAL_PATH}/"
 
