@@ -48,7 +48,7 @@ jobs:
         ./download-sdk.sh macos ${{ inputs.gog_galaxy_sdk_version }}
 
     - name: Import code signing certificates
-      uses: Apple-Actions/import-codesign-certs@v2
+      uses: Apple-Actions/import-codesign-certs@v3
       with:
         p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
         p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
