@@ -32,7 +32,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Install GOG Galaxy SDK
       shell: bash
@@ -73,7 +73,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Install GOG Galaxy SDK
       shell: bash
@@ -124,4 +124,4 @@ jobs:
 
     steps:
     - name: Check annotations
-      uses: OpenTTD/actions/annotation-check@v5
+      uses: OpenTTD/actions/annotation-check@v6
