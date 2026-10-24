@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Download source
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: internal-source
 
@@ -48,7 +48,7 @@ jobs:
         ./download-sdk.sh macos ${{ inputs.gog_galaxy_sdk_version }}
 
     - name: Import code signing certificates
-      uses: Apple-Actions/import-codesign-certs@v2
+      uses: Apple-Actions/import-codesign-certs@v7
       with:
         p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
         p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
@@ -174,14 +174,14 @@ jobs:
         mv _CPack_Packages/*/Bundle/gog-galaxy-social-*.zip bundles/
 
     - name: Store bundles
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: gog-galaxy-social-macos-universal
         path: build-x64/bundles
         retention-days: 5
 
     - name: Store symbols
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: symbols-macos-universal
         path: build-x64/symbols

@@ -25,7 +25,7 @@ jobs:
 
     steps:
     - name: Download source
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: internal-source
 
@@ -135,14 +135,14 @@ jobs:
         OPENTTD_PLUGIN_PRIVATE_KEY: ${{ secrets.OPENTTD_PLUGIN_PRIVATE_KEY }}
 
     - name: Store bundles
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: gog-galaxy-social-windows-${{ matrix.arch }}
         path: build/bundles
         retention-days: 5
 
     - name: Store symbols
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: symbols-windows-${{ matrix.arch }}
         path: build/symbols
